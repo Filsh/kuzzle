@@ -11,6 +11,5 @@ RUN set -ex && \
     npm install && \
     apk del --purge \
       build-base \
-      git \
       python
 
