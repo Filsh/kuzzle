@@ -1,5 +1,5 @@
 kuzzle:
-  image: kuzzleio/kuzzle
+  image: kuzzleio/dev:alpine
   command: /run-debug.sh
   volumes:
     - "..:/var/app"
@@ -20,7 +20,7 @@ kuzzle:
     - FEATURE_COVERAGE
 
 rabbit:
-  image: kuzzleio/rabbitmq
+  image: kuzzleio/rabbitmq:alpine
   ports:
     - "61613:61613"
     - "1883:1883"
@@ -28,7 +28,9 @@ rabbit:
     - "15672:15672"
 
 redis:
-  image: redis:3.0
+  image: redis:3.0-alpine
 
 elasticsearch:
   image: elasticsearch:1.7
+  # 2.2 version only is migrated to alpine:
+  # image: kuzzleio/elasticsearch
