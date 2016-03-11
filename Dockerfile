@@ -3,4 +3,14 @@ MAINTAINER Kuzzle <support@kuzzle.io>
 
 ADD ./ /var/app/
 
-RUN npm install
+RUN set -ex && \
+    apk add \
+      build-base \
+      git \
+      python && \
+    npm install && \
+    apk del --purge \
+      build-base \
+      git \
+      python
+
