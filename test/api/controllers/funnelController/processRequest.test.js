@@ -1,8 +1,9 @@
 var
   should = require('should'),
   q = require('q'),
+  sinon = require('sinon'),
   RequestObject = require.main.require('lib/api/core/models/requestObject'),
-  UnauthorizedError = require.main.require('lib/api/core/errors/unauthorizedError'),
+  ResponseObject = require.main.require('lib/api/core/models/responseObject'),
   params = require('rc')('kuzzle'),
   Kuzzle = require.main.require('lib/api/Kuzzle'),
   Profile = require.main.require('lib/api/core/models/security/profile'),
@@ -12,6 +13,8 @@ var
   rewire = require('rewire'),
   FunnelController = rewire('../../../../lib/api/controllers/funnelController');
 
+require('sinon-as-promised')(q.Promise);
+
 describe('funnelController.processRequest', function () {
   var
     context = {
@@ -19,158 +22,134 @@ describe('funnelController.processRequest', function () {
       token: null
     },
     kuzzle,
-    processRequest;
+    processRequest = FunnelController.__get__('processRequest'),
+    stubs = {
+      verifyToken: () => {
+        var token = new Token();
+        token._id = undefined;
+        token.user = {
+          _id: -1,
+          profile: {
+            _id: 'anonymous',
+            isActionAllowed: () => q(false)
+          }
+        };
+        return q(token);
+      }
+    };
 
-  beforeEach(function (callback) {
+  before(() => {
     kuzzle = new Kuzzle();
-    kuzzle.removeAllListeners();
-    kuzzle.start(params, {dummy: true})
-      .then(function () {
-        kuzzle.repositories.role.roles.anonymous = new Role();
-        params.roleWithoutAdmin._id = 'anonymous';
-        return kuzzle.repositories.role.hydrate(kuzzle.repositories.role.roles.anonymous, params.roleWithoutAdmin);
-      })
-      .then(function () {
-        kuzzle.repositories.profile.profiles.anonymous = {_id: 'anonymous', roles: ['anonymous']};
-        return q(kuzzle.repositories.profile.profiles.anonymous);
-      })
-      .then(function (res) {
-        return kuzzle.repositories.token.anonymous();
-      })
-      .then(function (anonymousToken) {
-        context.token = anonymousToken;
-        processRequest = FunnelController.__get__('processRequest');
-        callback();
-      })
-      .catch(error => callback(error));
+
+    return kuzzle.start(params, {dummy: true});
   });
 
-  it('should reject the promise if no controller is specified', function () {
-    var object = {
-      action: 'create'
-    };
+  beforeEach(() => {
+    sandbox = sinon.sandbox.create();
+    sandbox.stub(kuzzle.repositories.token, 'verifyToken').resolves({
+      user: {
+        _id: -1,
+        profile: {
+          _id: 'anonymous',
+          isActionAllowed: () => q(true)
+        }
+      }
+    });
+    sandbox.stub(kuzzle.funnel.controllers.read, 'serverInfo').resolves(new ResponseObject({}));
+   });
 
-    var requestObject = new RequestObject(object);
-
-    return should(processRequest(kuzzle, kuzzle.funnel.controllers, requestObject, context)).be.rejected();
+  afterEach(() => {
+    sandbox.restore();
   });
 
-  it('should reject the promise if no action is specified', function () {
-    var object = {
-      controller: 'write'
-    };
-
-    var requestObject = new RequestObject(object);
-
-    return should(processRequest(kuzzle, kuzzle.funnel.controllers, requestObject, context)).be.rejected();
+  it('should reject the promise if no controller is specified', () => {
+    var requestObject = new RequestObject({action: 'create'});
+    return should(processRequest(kuzzle, kuzzle.funnel.controllers, requestObject, context)).be.rejectedWith(ResponseObject, {status: 400});
   });
 
-  it('should reject the promise if the controller doesn\'t exist', function () {
-    var object = {
+  it('should reject the promise if no action is specified', () => {
+    var requestObject = new RequestObject({controller: 'write'});
+    return should(processRequest(kuzzle, kuzzle.funnel.controllers, requestObject, context)).be.rejectedWith(ResponseObject, {status: 400});
+  });
+
+  it('should reject the promise if the controller doesn\'t exist', () => {
+    var requestObject = new RequestObject({
       controller: 'toto',
       action: 'create'
-    };
-
-    var requestObject = new RequestObject(object);
-
-    return should(processRequest(kuzzle, kuzzle.funnel.controllers, requestObject, context)).be.rejected();
+    });
+    return should(processRequest(kuzzle, kuzzle.funnel.controllers, requestObject, context)).be.rejectedWith(ResponseObject, {status: 400});
   });
 
-  it('should reject the promise if the action doesn\'t exist', function () {
-    var object = {
+  it('should reject the promise if the action doesn\'t exist', () => {
+    var requestObject = new RequestObject({
       controller: 'write',
       action: 'toto'
-    };
-
-    var requestObject = new RequestObject(object);
-
-    return should(processRequest(kuzzle, kuzzle.funnel.controllers, requestObject, context)).be.rejected();
+    });
+    return should(processRequest(kuzzle, kuzzle.funnel.controllers, requestObject, context)).be.rejectedWith(ResponseObject, {status: 400});
   });
 
   it('should reject the promise if the user is not allowed to execute the action', () => {
     var
       token = new Token(),
-      role = new Role(),
-      user = new User();
+      user = new User(),
+      requestObject = new RequestObject({
+        controller: 'read',
+        action: 'serverInfo'
+      });
 
-    role.indexes = {
-      '*': {
-        collections: {
-          '*': {
-            controllers: {
-              '*': {
-                actions: {
-                  '*': false
-                }
-              }
-            }
-          }
+    kuzzle.repositories.token.verifyToken.restore();
+    sandbox.stub(kuzzle.repositories.token, 'verifyToken').resolves({
+      user: {
+        _id: -1,
+        profile: {
+          _id: 'anonymous',
+          isActionAllowed: () => q(false)
         }
       }
-    };
+    });
 
-    user._id = 'testUser';
-    user.profile = new Profile();
-    user.profile.roles = [role];
+    return should(processRequest(kuzzle, kuzzle.funnel.controllers, requestObject, context)).be.rejectedWith(ResponseObject, {status: 401})
+    .then(() => {
+      kuzzle.repositories.token.verifyToken.restore();
+      sandbox.stub(kuzzle.repositories.token, 'verifyToken').resolves({
+        _id: 'fake-token',
+        user: {
+          _id: 'fake-user',
+          profile: {
+            _id: 'guest',
+            isActionAllowed: () => q(false)
+          }
+        }
+      });
+      return should(processRequest(kuzzle, kuzzle.funnel.controllers, requestObject, context)).be.rejectedWith(ResponseObject, {status: 403});
+    });
 
-    token._id = 'fake-token';
-    token.user = user;
-
-    kuzzle.repositories.token.verifyToken = function () { return q(token); };
-
-    return should(
-      processRequest(kuzzle, kuzzle.funnel.controllers,
-        new RequestObject({
-          controller: 'read',
-          index: '@test',
-          action: 'get'
-        }),
-        context)
-    ).be.rejectedWith(UnauthorizedError);
   });
 
-  it('should resolve the promise if everything is ok', function (done) {
-    var object = {
+  it('should resolve the promise if everything is ok', () => {
+    var requestObject = new RequestObject({
       requestId: 'requestId',
       controller: 'read',
-      action: 'listIndexes',
-      collection: 'user'
-    };
+      action: 'serverInfo'
+    });
 
-    var requestObject = new RequestObject(object);
-
-    processRequest(kuzzle, kuzzle.funnel.controllers,requestObject, context)
-      .then(() => {
-        done();
-      })
-      .catch(err => done(err));
+    return should(processRequest(kuzzle, kuzzle.funnel.controllers,requestObject, context)).not.be.rejected();
   });
 
-  it('should resolve the promise in case of a plugin controller action', function() {
+  it('should resolve the promise in case of a plugin controller action', () => {
     var
       pluginController = {
-        bar: function(requestObject){
-          return q();
-        }
+        bar: requestObject => q()
       },
-      FooController = function(context) {
-        return pluginController;
-      },
-      object = {
+      requestObject = new RequestObject({
         requestId: 'requestId',
         controller: 'myplugin/foo',
         action: 'bar',
         name: 'John Doe'
-      },
-      requestObject;
+      });
 
     // Reinitialize the Funnel controller with the dummy plugin controller:
-    kuzzle.pluginsManager.controllers = {
-      'myplugin/foo': FooController
-    };
-    kuzzle.funnel.init();
-
-    requestObject = new RequestObject(object);
+    sandbox.stub(kuzzle.funnel, 'controllers', {'myplugin/foo': pluginController});
 
     return should(processRequest(kuzzle, kuzzle.funnel.controllers,requestObject, context)).not.be.rejected();
   });

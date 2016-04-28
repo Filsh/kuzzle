@@ -6,14 +6,15 @@ var
   rewire = require('rewire'),
   uuid = require('node-uuid'),
   RequestObject = require.main.require('lib/api/core/models/requestObject'),
+  ResponseObject = require.main.require('lib/api/core/models/responseObject'),
   BadRequestError = require.main.require('lib/api/core/errors/badRequestError');
 
-describe('Test: requestObject', function () {
+describe('Test: requestObject', () => {
   var
     protocol = 'foobar',
     request;
 
-  beforeEach(function () {
+  beforeEach(() => {
     request = {
       action: 'fakeAction',
       controller: 'fakeController',
@@ -27,14 +28,14 @@ describe('Test: requestObject', function () {
     };
   });
 
-  it('should have required prototypes defined', function () {
+  it('should have required prototypes defined', () => {
     var requestObject = new RequestObject({}, {}, '');
 
     should(requestObject.checkInformation).not.be.undefined().and.be.a.Function();
     should(requestObject.isValid).not.be.undefined().and.be.a.Function();
   });
 
-  it('should initialize a valid request object out of a basic request', function () {
+  it('should initialize a valid request object out of a basic request', () => {
     var
       timestampStart = (new Date()).getTime(),
       timestampEnd,
@@ -56,7 +57,7 @@ describe('Test: requestObject', function () {
     should(requestObject.timestamp).be.a.Number().and.be.within(timestampStart, timestampEnd);
   });
 
-  it('should ignore the query member if a body is defined', function () {
+  it('should ignore the query member if a body is defined', () => {
     var requestObject;
 
     request.query = { foo: 'bar' };
@@ -65,7 +66,7 @@ describe('Test: requestObject', function () {
     should(requestObject.query).be.undefined();
   });
 
-  it('should replace the entire data structure by the request itself if a query member is provided in the request', function () {
+  it('should replace the entire data structure by the request itself if a query member is provided in the request', () => {
     var
       query = { foo: 'bar' },
       requestObject;
@@ -77,7 +78,7 @@ describe('Test: requestObject', function () {
     should(requestObject.data).match(request);
   });
 
-  it('should replace the entire data structure by the additional data if it contains a query member', function () {
+  it('should replace the entire data structure by the additional data if it contains a query member', () => {
     var
       additionalData = { query: {bar: 'foo' }},
       requestObject;
@@ -88,7 +89,7 @@ describe('Test: requestObject', function () {
     should(requestObject.data).match(additionalData);
   });
 
-  it('should initialize the data.body structure with the additional data argument if none of the previous cases matches', function () {
+  it('should initialize the data.body structure with the additional data argument if none of the previous cases matches', () => {
     var
       additionalData = { foo: 'bar'},
       requestObject;
@@ -100,7 +101,7 @@ describe('Test: requestObject', function () {
     should(requestObject.data.body).match(additionalData);
   });
 
-  it('should initialize an UUID-like requestID if none was provided', function () {
+  it('should initialize an UUID-like requestID if none was provided', () => {
     var requestObject;
 
     delete request.requestId;
@@ -109,7 +110,7 @@ describe('Test: requestObject', function () {
     should(requestObject.requestId).not.be.undefined().and.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   });
 
-  it('should return a promise when checkInformation is called', function () {
+  it('should return a promise when checkInformation is called', () => {
     var
       requestObject = new RequestObject(request, {}, ''),
       checkInformation = requestObject.checkInformation();
@@ -118,25 +119,25 @@ describe('Test: requestObject', function () {
     return should(checkInformation).be.fulfilled();
   });
 
-  it('should reject the promise if no controller has been provided', function () {
+  it('should reject the promise if no controller has been provided', () => {
     var requestObject;
 
     delete request.controller;
     requestObject = new RequestObject(request, {}, '');
 
-    return should(requestObject.checkInformation()).be.rejectedWith(BadRequestError, { message: 'No controller provided for object' });
+    return should(requestObject.checkInformation()).be.rejectedWith(ResponseObject, {status: 400, error: { message: 'No controller provided for object' }});
   });
-  it('should reject the promise if no action has been provided', function () {
+  it('should reject the promise if no action has been provided', () => {
 
     var requestObject;
 
     delete request.action;
     requestObject = new RequestObject(request, {}, '');
 
-    return should(requestObject.checkInformation()).be.rejectedWith(BadRequestError, { message: 'No action provided for object' });
+    return should(requestObject.checkInformation()).be.rejectedWith(ResponseObject, {status: 400, error: { message: 'No action provided for object' }});
   });
 
-  it('should return a promise when isValid is invoked', function () {
+  it('should return a promise when isValid is invoked', () => {
     var
       requestObject = new RequestObject(request, {}, ''),
       isValid = requestObject.isValid();
@@ -145,7 +146,7 @@ describe('Test: requestObject', function () {
     return should(isValid).be.fulfilled();
   });
 
-  it('should reject the promise if there is no data.body', function () {
+  it('should reject the promise if there is no data.body', () => {
     var requestObject;
 
     delete request.body;
@@ -154,7 +155,7 @@ describe('Test: requestObject', function () {
     return should(requestObject.isValid()).be.rejectedWith(BadRequestError, { message: 'The body can\'t be empty' });
   });
 
-  it('should get the _id of the additional data', function () {
+  it('should get the _id of the additional data', () => {
     var
       additionalData = { _id: 'fakeId2'},
       requestObject;
@@ -166,7 +167,7 @@ describe('Test: requestObject', function () {
     should(requestObject.data._id).be.exactly('fakeId2');
   });
 
-  it('should get the metadata from additional data', function () {
+  it('should get the metadata from additional data', () => {
     var
       additionalData = { metadata: { foo: 'bar' }},
       requestObject = new RequestObject(request, additionalData, protocol);
@@ -174,7 +175,7 @@ describe('Test: requestObject', function () {
     should(requestObject.metadata).not.be.undefined().and.match(additionalData.metadata);
   });
 
-  it('should get the metadata from the request', function () {
+  it('should get the metadata from the request', () => {
     var requestObject;
 
     request.metadata = { foo: 'bar' };
@@ -183,7 +184,7 @@ describe('Test: requestObject', function () {
     should(requestObject.metadata).not.be.undefined().and.match(request.metadata);
   });
 
-  it('should take the metadata from the additional prior to the main request object', function () {
+  it('should take the metadata from the additional prior to the main request object', () => {
     var
       additionalData = { metadata: { foo: 'bar' }},
       requestObject;
@@ -194,7 +195,7 @@ describe('Test: requestObject', function () {
     should(requestObject.metadata).not.be.undefined().and.match(additionalData.metadata);
   });
 
-  it('should ignore metadata if they are not a json object', function () {
+  it('should ignore metadata if they are not a json object', () => {
     var
       additionalData = { metadata: 'foobar'},
       requestObject;
