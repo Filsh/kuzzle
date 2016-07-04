@@ -1,9 +1,11 @@
 var
   should = require('should'),
-  Profile = require.main.require('lib/api/core/models/security/profile'),
-  Role = require.main.require('lib/api/core/models/security/role');
+  _ = require('lodash'),
+  describe = require('ava-spec').describe,
+  Profile = require.main.require('../../../lib/api/core/models/security/profile'),
+  Role = require.main.require('../../../lib/api/core/models/security/role');
 
-describe('Test: security/profileTest', function () {
+describe('Test: security/profileTest', it => {
   var
     context = {connection: null, user: null},
     requestObject = {
@@ -13,13 +15,12 @@ describe('Test: security/profileTest', function () {
       action: 'action'
     };
 
-  it('should disallow any action when no role be found', function () {
+  it('should disallow any action when no role be found', t => {
     var profile = new Profile();
-
     return should(profile.isActionAllowed(requestObject, context)).be.fulfilledWith(false);
   });
 
-  it('should allow the action if one of the roles allows it', () => {
+  it('should allow the action if one of the roles allows it', t => {
     var
       anotherContext = {connection: null, user: null},
       profile = new Profile(),
@@ -65,7 +66,7 @@ describe('Test: security/profileTest', function () {
       .then(isAllowed => should(isAllowed).be.false());
   });
 
-  it('should retrieve the good rights list', function () {
+  it('should retrieve the good rights list', t => {
     var
       profile = new Profile(),
       role1 = new Role(),

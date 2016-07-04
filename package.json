@@ -9,8 +9,9 @@
     "kuzzle": "./bin/kuzzle"
   },
   "scripts": {
-    "test": "npm run --silent lint && npm run unit-testing --coverage && npm run functional-testing && npm run crawl-coverage",
-    "unit-testing": "istanbul test _mocha",
+    "test": "npm run --silent lint && npm run unit-testing && npm run functional-testing && npm run crawl-coverage",
+    "unit-testing": "nyc --reporter=lcov npm run ava",
+    "ava": "ava test -v",
     "functional-testing": "npm run cucumber",
     "cucumber": "cucumber.js --fail-fast",
     "crawl-coverage": "node coverage/scripts/feature-coverage-download.js",
@@ -67,14 +68,16 @@
     "url": "git://github.com/kuzzleio/kuzzle.git"
   },
   "devDependencies": {
+    "ava": "0.15.2",
+    "ava-spec": "1.0.1",
     "codecov.io": "^0.1.6",
     "cucumber": "0.10.2",
     "eslint": "2.8.0",
     "istanbul": "0.4.3",
     "istanbul-middleware": "0.2.2",
-    "mocha": "2.4.5",
     "mock-require": "^1.3.0",
     "mqtt": "1.8.0",
+    "nyc": "6.6.1",
     "parser-yaml": "^0.1.1",
     "rewire": "2.5.1",
     "should": "8.3.1",
